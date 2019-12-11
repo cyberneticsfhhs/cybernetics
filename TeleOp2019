@@ -1,0 +1,450 @@
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+
+@TeleOp(name="WERE USING THIS ONE", group="Iterative Opmode")
+
+public class Poop extends OpMode
+{
+    //poop poop poop poop poop yummy 
+    // Declare OpMode members.
+    private DcMotor left, right, head, butt, elevator1, elevator2;
+    private Servo clamp, chomper2, leftTail, rightTail;
+    private boolean isGrabbed, gameMode;
+    private int encoderE1, encoderE2, leftEncoder, rightEncoder, headEncoder, buttEncoder;
+    private double deg;
+    private long future,now;
+    
+    /*
+     * Code to run ONCE when the driver hits INIT
+     */
+    @Override
+    public void init()
+    {
+        telemetry.addData("Status", "Initialized");
+        
+        try
+        {
+            left = hardwareMap.get(DcMotor.class,"leftWheel");
+        }
+        catch(Exception e)
+        {
+            left = null;
+            telemetry.addLine("leftWheel is not connected");
+        }
+        try
+        {
+            butt = hardwareMap.get(DcMotor.class, "buttWheel");
+        }
+        catch(Exception e)
+        {
+            butt = null;
+            telemetry.addLine("buttWheel is not connected");
+        }
+        try
+        {
+            right = hardwareMap.get(DcMotor.class,"rightWheel");
+        } 
+        catch(Exception e)
+        {
+            right = null;
+            telemetry.addLine("rightWheel is not connected");
+        }
+        try
+        {
+            head = hardwareMap.get(DcMotor.class,"headWheel");
+        }
+        catch(Exception e)
+        {
+            head = null;
+            telemetry.addLine("headWheel is not connected");
+        }
+        try
+        {
+            elevator1 = hardwareMap.get(DcMotor.class, "elevator1");
+        }
+        catch(Exception e)
+        {
+            elevator1 = null;
+            telemetry.addLine("elevator1 is not connected");
+        }
+        try 
+        {
+            elevator2 = hardwareMap.get(DcMotor.class, "elevator2");
+        }
+        catch(Exception e)
+        {
+            elevator2 = null;
+            telemetry.addLine("elevator2 is not connected");
+        }
+        try
+        {
+            clamp = hardwareMap.get(Servo.class, "clamp");
+        }
+        catch(Exception e)
+        {
+            clamp = null;
+            telemetry.addLine("clamp is not connected");
+        }
+        try {
+            chomper2 = hardwareMap.get(Servo.class, "chomper2");
+        }
+        catch(Exception e) {
+            chomper2 = null;
+            telemetry.addLine("chomper2 is not connected");
+        }
+        try {
+            leftTail = hardwareMap.get(Servo.class, "leftTail");
+        }
+        catch (Exception e) {
+            leftTail = null;
+            telemetry.addLine("leftTail is not connected"); 
+        }
+        try
+        {
+            rightTail = hardwareMap.get(Servo.class, "rightTail");
+        }
+        catch(Exception e)
+        {
+            rightTail = null;
+            telemetry.addLine("rightTail is not connected");
+        }
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        isGrabbed = false; 
+        deg = 0.6;
+        future = -1; 
+        gameMode = true;
+    }
+
+    /*
+     * Code to run REPEATEDLY after the driver hits INIT, but before they hit PLAY
+     */
+    @Override
+    public void init_loop()
+    {
+        
+    }
+
+    /*
+     * Code to run ONCE when the driver hits PLAY
+     */
+    @Override
+    public void start()
+    {
+    
+    }
+
+    /*
+     * Code to run REPEATEDLY after the driver hits PLAY but before they hit STOP
+     */
+    @Override
+    public void loop()
+    {
+        now = System.currentTimeMillis();
+        if(left != null && right != null && head != null && butt != null)
+            drive();
+        if(elevator1 != null)
+            upDown(1);
+        if(elevator2 != null)
+            upDown(1);
+        if(clamp != null)
+            grabIt();
+        /*if(chomper != null)
+            chomp(.2);
+        */
+        if(chomper2!=null)
+            chompchomp();
+        if(leftTail != null && rightTail != null)
+            prehensileTail();
+            
+        
+        
+        
+    }
+    
+    public void drive()
+    {
+        float y1value = gamepad1.left_stick_y;
+        float x1value = gamepad1.left_stick_x;
+        float x2value = gamepad1.right_stick_x;
+        
+        double pow = 0.7818181818*x2value;
+        double angleRad = Math.atan(y1value/x1value);
+        //strafing/forward
+        if(x1value<0)
+        {
+            angleRad = Math.PI + angleRad;
+        }
+        else if(y1value<0)
+        {
+            angleRad = 2*(Math.PI) + angleRad;
+        }
+        
+        //turning
+        
+        if(x2value!= 0)
+            turnRight(pow);
+        else
+        {
+            /*
+            if(x2value < 0)
+            {
+                turnLeft(pow);
+            }
+            else if(x2value > 0)
+            {
+                turnRight(pow);
+            }*/
+            
+            double frontPow = -Math.cos(angleRad);
+            double buttPow = Math.cos(angleRad);
+            double rightPow = -Math.sin(angleRad);
+            double leftPow = Math.sin(angleRad);
+            
+            leftEncoder = left.getCurrentPosition();
+            rightEncoder = right.getCurrentPosition();
+            headEncoder = head.getCurrentPosition();
+            buttEncoder = butt.getCurrentPosition();
+            
+            telemetry.addData("leftEncoder: ", leftEncoder);
+            telemetry.addData("rightEncoder: ", rightEncoder);
+            telemetry.addData("headEncoder: ", headEncoder);
+            telemetry.addData("buttEncoder: ", buttEncoder);
+            
+            head.setPower(frontPow);
+            butt.setPower(buttPow);
+            right.setPower(rightPow);
+            left.setPower(leftPow);
+            
+            double angleDegree=(angleRad *180)/Math.PI;
+            telemetry.addData("angle: ", angleDegree);
+        }
+    }
+    
+    public void stopDriving()
+    {
+        head.setPower(0);
+        left.setPower(0);
+        right.setPower(0);
+        butt.setPower(0);
+    }
+    public void turnRight(double pow)
+    {
+        head.setPower(-pow);
+        butt.setPower(-pow);
+        left.setPower(-pow);
+        right.setPower(-pow);
+    }
+    public void turnLeft(double pow)
+    {
+        head.setPower(pow);
+        butt.setPower(pow);
+        left.setPower(pow);
+        right.setPower(pow);
+    }
+    //moving the elevators up & down
+    public void upDown(double pow)
+    {
+        //upper limit for e1 tape & lower limit for e1 bottom
+        float rightTrigger = gamepad1.right_trigger;
+        float leftTrigger = gamepad1.left_trigger;
+        boolean rightBumper = gamepad1.right_bumper;
+        boolean leftBumper = gamepad1.left_bumper;
+        boolean x = gamepad1.x;
+        boolean y = gamepad1.y;
+        boolean start = gamepad1.start;
+        
+        if(start && gameMode && now >= future)
+        {
+            gameMode = false;
+            future = now + 500;
+        }
+        else if(start && !gameMode && now >= future)
+        {
+            gameMode = true;
+            future = now + 500;
+        }
+        
+        encoderE1 = elevator1.getCurrentPosition();
+        encoderE2 = elevator2.getCurrentPosition();
+        if(gameMode)
+        {
+            if(rightTrigger > 0)
+            {
+                if(encoderE1 > -3500)
+                    elevator1.setPower(-pow);
+                else
+                    elevator1.setPower(0);
+                    
+                if(encoderE2 < 14200)
+                    elevator2.setPower(-pow);
+                else
+                    elevator2.setPower(0);
+            }
+            else if(leftTrigger > 0)
+            {
+                if(encoderE1 <= -600)
+                    elevator1.setPower(pow/2);
+                else
+                    elevator1.setPower(0);
+                    
+                if(encoderE2 >= 1600)
+                    elevator2.setPower(pow);
+                else
+                    elevator2.setPower(0);
+            }
+            else {
+                elevator1.setPower(0);
+                elevator2.setPower(0);
+            }
+        }
+        else {
+            if(rightBumper)
+            {
+                elevator2.setPower(-pow);
+            }
+            else if(leftBumper)
+            {
+                elevator2.setPower(pow);
+            }
+            else if(x)
+            {
+                elevator1.setPower(pow);
+            }
+            else if(y)
+            {
+                elevator1.setPower(-pow);
+            }
+            else
+            {
+                elevator1.setPower(0);
+                elevator2.setPower(0);
+            }
+        }
+        telemetry.addData("Encoder: ", encoderE1);
+        telemetry.addData("Encoder: ", encoderE2);
+        telemetry.addData("Game Mode :", gameMode);
+        
+    }
+    /*public void chomp(double pow)
+    {
+        boolean up = gamepad1.dpad_up;
+        boolean down = gamepad1.dpad_down;
+        
+        encoderChomper = chomper.getCurrentPosition();
+        if(up && !isClamp)
+        {
+            chomper.setPower(-pow);
+        }
+        else if(down && !isClamp)
+        {
+            chomper.setPower(pow);
+        }
+        else if(up && isClamp) 
+        {
+            chomper.setPower(-0.3);
+        }
+        else if(down && isClamp) 
+        {
+            chomper.setPower(pow);
+        }
+        else
+        {
+            if(encoderChomper >= 50 && isClamp)
+                chomper.setPower(-0.015);
+            else if(encoderChomper>=50)
+                chomper.setPower(-0.005);
+            else
+                chomper.setPower(0.005);
+        }
+        
+        telemetry.addData("Chomp Encoder: ", encoderChomper);
+    }*/
+    public void chompchomp() {
+        boolean up = gamepad1.dpad_up;
+        boolean down = gamepad1.dpad_down;
+        
+        /*if(up) {
+            chomper2.setPosition(0.6);
+        }
+        else if(down) {
+            chomper2.setPosition(1);
+        } */
+        
+        if(up && deg>=0.6) {
+            deg -= 0.01;
+            chomper2.setPosition(deg);
+            
+        }
+        else if(down && deg<=1) {
+            deg += 0.01;
+            chomper2.setPosition(deg);
+        }
+        telemetry.addData("Chomper Deg: ", deg);
+    }
+    public void grabIt()
+    {
+        boolean press = gamepad1.a;
+        
+        if(press && !isGrabbed && (now >= future))
+        {
+            clamp.setPosition(1);
+            isGrabbed = true;
+            future = now + 500;
+        }
+        else if(press && isGrabbed && (now >= future))
+        {
+            clamp.setPosition(0.7);
+            isGrabbed = false;
+            future = now + 500;
+        }
+        telemetry.addData("A pressed: ", press);
+    }
+    public void prehensileTail()
+    {
+        boolean grab = gamepad1.b;
+        
+        if(grab && !isGrabbed && (now >= future))
+        {
+            leftTail.setPosition(0.3);
+            rightTail.setPosition(0.25);//change this (was 1)
+            isGrabbed = true;
+            future = now + 500;
+        }
+        else if(grab && isGrabbed && (now >= future))
+        {
+            leftTail.setPosition(0.6);
+            rightTail.setPosition(0);
+            isGrabbed = false;
+            future = now + 500;
+        }
+        telemetry.addData("B pressed: ", grab);
+        telemetry.addData("position: ", isGrabbed);
+    }
+    
+    public void setMotorMode(DcMotor.RunMode mode) 
+    {
+        elevator1.setMode(mode);
+        elevator2.setMode(mode);
+        left.setMode(mode);
+        right.setMode(mode);
+        head.setMode(mode);
+        butt.setMode(mode);
+    }
+    /*
+     * Code to run ONCE after the driver hits STOP
+     */
+    @Override
+    public void stop()
+    {
+        
+    }
+
+}
