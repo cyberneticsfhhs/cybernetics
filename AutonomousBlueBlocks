@@ -1,0 +1,996 @@
+
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.Camera;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.eventloop.opmode.Autoa
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.Camera;
+import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+
+@Autonomous(name="BLUE BLOCKS", group="Iterative Opmode")
+
+public class AutonomousBlueBlocks extends OpMode
+{
+    // Declare OpMode members.
+    private DcMotor left, right, head, butt, elevator1, elevator2;
+    private Servo leftTail, rightTail, chomper, clamp;
+    private int leftEncoder, rightEncoder, headEncoder, buttEncoder, e1Encoder, e2Encoder;
+    private CameraSetupII cam;
+    private boolean ssDetected, notUsingCamera, isGrabbed;
+    private int locSkystone, counter, step, retrace;
+    private long now, future;
+
+    /*
+     * Code to run ONCE when the driver hits INIT
+     */
+    @Override
+    public void init()
+    {
+        telemetry.addData("Status", "Initialized");
+        
+        try 
+        {
+            left = hardwareMap.get(DcMotor.class, "leftWheel");
+        }
+        catch(Exception e) 
+        {
+            left = null;
+            telemetry.addLine("left is not connected");
+        }
+        try
+        {
+            butt = hardwareMap.get(DcMotor.class, "buttWheel");
+        }
+        catch(Exception e)
+        {
+            butt = null;
+            telemetry.addLine("buttWheel is not connected");
+        }
+        try
+        {
+            right = hardwareMap.get(DcMotor.class,"rightWheel");
+        } 
+        catch(Exception e)
+        {
+            right = null;
+            telemetry.addLine("rightWheel is not connected");
+        }
+        try
+        {
+            head = hardwareMap.get(DcMotor.class,"headWheel");
+        }
+        catch(Exception e)
+        {
+            head = null;
+            telemetry.addLine("headWheel is not connected");
+        }
+        try
+        {
+            elevator1 = hardwareMap.get(DcMotor.class, "elevator1");
+        }
+        catch(Exception e)
+        {
+            elevator1 = null;
+            telemetry.addLine("elevator1 is not connected");
+        }
+        try 
+        {
+            elevator2 = hardwareMap.get(DcMotor.class, "elevator2");
+        }
+        catch(Exception e)
+        {
+            elevator2 = null;
+            telemetry.addLine("elevator2 is not connected");
+        }
+        try
+        {
+            clamp = hardwareMap.get(Servo.class, "clamp");
+        }
+        catch(Exception e)
+        {
+            clamp = null;
+            telemetry.addLine("clamp is not connected");
+        }
+        try {
+            chomper = hardwareMap.get(Servo.class, "chomper2");
+        }
+        catch(Exception e) 
+        {
+            chomper = null;
+            telemetry.addLine("chomper2 is not connected");
+        }
+        try 
+        {
+            leftTail = hardwareMap.get(Servo.class, "leftTail");
+        }
+        catch (Exception e) 
+        {
+            leftTail = null;
+            telemetry.addLine("leftTail is not connected"); 
+        }
+        try
+        {
+            rightTail = hardwareMap.get(Servo.class, "rightTail");
+        }
+        catch(Exception e)
+        {
+            rightTail = null;
+            telemetry.addLine("rightTail is not connected");
+        }
+        cam = new CameraSetupII(telemetry, hardwareMap);
+        cam.activate();
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        
+        counter = 0;
+        notUsingCamera = true;
+        step = 1;
+        retrace = 0;
+        isGrabbed = false;
+        
+        future = -1;
+        
+        telemetry.addData("Status", "Initialized");
+    }
+
+    /*
+     * Code to run REPEATEDLY after the driver hits INIT, but before they hit PLAY
+     */
+    @Override
+    public void init_loop() 
+    {
+        
+    }
+
+    /*
+     * Code to run ONCE when the driver hits PLAY
+     */
+    @Override
+    public void start() 
+    {
+        
+    }
+
+    /*
+     * Code to run REPEATEDLY after the driver hits PLAY but before they hit STOP
+     */
+    @Override
+    public void loop() 
+    {
+        now = System.currentTimeMillis();
+        rightEncoder = right.getCurrentPosition();
+        telemetry.addData("ENCODA NIBBA right: ", rightEncoder);
+        leftEncoder = left.getCurrentPosition();
+        telemetry.addData("ENCODA NIBBAlefy: ", leftEncoder);
+        headEncoder = head.getCurrentPosition();
+        telemetry.addData("head encoder: ", headEncoder);
+        
+        telemetry.addData("retrace = ", retrace);
+        
+        if(step == 1)
+        {
+            drive(1000,0.5);
+        }
+        else if(step == 2)
+        {
+            if(notUsingCamera)
+            {
+                
+                drive(1000, 0.5);
+                notUsingCamera = false;
+            }
+            else
+            {
+                printData();
+            
+                if(ssDetected)
+                {
+                    if(locSkystone == 0)
+                    {
+                        retrace = headEncoder;
+                        stopped();
+                        step = 3;
+                    }
+                    else if(locSkystone == -1)
+                    {
+                        strafePow(-0.1);
+                    }
+                    else
+                    {
+                        strafePow(0.1);
+                    }
+                }
+                else
+                {
+                    strafePow(-0.15);
+                }
+            }
+        }
+        else if(step == 3)
+        {
+            drive(1850,0.5);
+        }
+        else if(step == 4)
+        {
+            strafe(150,0.5);
+            future = now + 1000; 
+            clamp.setPosition(0.55);
+        }
+        else if(step == 5) 
+        {
+            //retrace+=headEncoder;
+            chomp(1);
+        }
+        else if(step == 6)
+        {
+            clampclamp(1);
+        }
+        else if(step == 7)
+        {
+            chomp(.8);
+        }
+        else if(step == 8) 
+        {
+            drive(-750,0.5);
+        }
+        else if(step == 9)
+        {
+            strafe(-(retrace),0.4);
+        }
+        else if(step == 10) 
+        {
+            strafe(-4000,1);    
+        }
+        else if(step == 11) 
+        {
+            clampclamp(0.55);
+        }
+        else if(step == 12)
+        {
+            strafe(1000,1);
+        }
+        else 
+        {
+            stopped();
+        }
+        telemetry.addData("step ", step);
+        /*if(notUsingCamera)
+        {
+            
+            drive(1000, 0.5);
+            notUsingCamera = false;
+        }
+        else
+        {
+            printData();
+        
+            if(ssDetected)
+            {
+                if(locSkystone == 0)
+                {
+                    stopped();
+                }
+                else if(locSkystone == -1)
+                {
+                    strafePow(-0.1);
+                }
+                else
+                {
+                    strafePow(0.1);
+                }
+            }
+            else
+            {
+                strafePow(0.2);
+            }
+        }
+        */
+        
+        
+        
+        
+        
+        //start with stop as false
+        //red foundation and blocks
+        /*if(stop)
+        {
+            stopped();
+        }
+        else
+        {
+            if(notusingcamera)
+            {
+                if(section == 1) // start with section = 1
+                {
+                    strafeRight(100); //change these encoder values
+                    tailDown();
+                    strafeLeft(100);
+                    strafeRight(50);
+                    turnRight(); // turn 90 degrees using gyro
+                    notusingcamera = false;
+                }
+                else if(section == 2)
+                {
+                    counter++; //skystone grabbed 
+                    drive(45,0.5); //+ for forward, - for backwards
+                    openClamp(); // you can make a method to grab block
+                    chompDown();
+                    closeClamp();
+                    backward(45);
+                    strafeRight(); // use encoder number from when the robot starts detecting
+                    openClamp(); // you can make a method to release block
+                    strafeLeft(10); // strafe out of block
+                    notusingcamera = false;
+                    if(counter == 2)
+                    {
+                        // use color detector to park
+                        stop = true;
+                    }
+                }
+            }
+            else // !notusingcamera
+            {
+                if(ssDetected)
+        {
+            if(locSkystone == 0)
+            {
+                stopped();
+                section = 2;
+            }
+            else if(locSkystone == -1)
+            {
+                strafePow(-0.1);
+            }
+            else
+            {
+                strafePow(0.1);
+            }
+        }
+        else
+        {
+            strafePow(0.2);
+        }
+                //when robot finds it set section = 2 and notusingcamera = true
+            }
+        }
+        */
+
+    }
+    public void setMotorMode(DcMotor.RunMode mode) 
+    {
+        left.setMode(mode);
+        right.setMode(mode);
+        head.setMode(mode);
+        butt.setMode(mode);
+        elevator1.setMode(mode);
+        elevator2.setMode(mode);
+    }
+    public void tailDown()
+    {
+        // set position here
+    }
+    public void tailUp()
+    {
+        // set position
+    }
+    public void chomp(double pos)
+    {
+        chomper.setPosition(pos);
+        if(now >= future)
+        {
+            future = now + 1000;
+            step++;
+        }
+    }
+    public void clampclamp(double pos)
+    {
+        clamp.setPosition(pos);
+        if(now >= future)
+        {
+            future = now + 1000;
+            step++;
+        }
+    }/*
+    public void turnRight()
+    {
+        
+    }
+    public void turnLeft()
+    {
+        
+    }
+    */
+    public void strafePow(double pow)
+    {
+        left.setPower(0);
+        right.setPower(0);
+        butt.setPower(pow);
+        head.setPower(-pow);
+    }
+    public void drive(int encoder, double pow)
+    {
+        if(encoder>0 && right.getCurrentPosition() <= encoder) 
+        {
+            left.setPower(-pow);
+            right.setPower(pow);
+        }
+        else if(encoder<0 && right.getCurrentPosition() >= encoder)
+        {
+            left.setPower(pow);
+            right.setPower(-pow);
+        }
+        else 
+        {
+            left.setPower(0);
+            right.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    //right = +, left = - 
+    public void strafe(int encoder, double pow)
+    {
+        if(encoder<0 && head.getCurrentPosition() >= encoder)
+        {
+            head.setPower(-pow);
+            butt.setPower(pow);
+        }
+        else if(encoder>0 && head.getCurrentPosition() <= encoder) 
+        {
+            head.setPower(pow);
+            butt.setPower(-pow);
+        }
+        else 
+        {
+            head.setPower(0);
+            butt.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    public void prehensileTail()
+    {
+        if(!isGrabbed)
+        {
+            leftTail.setPosition(0);
+            rightTail.setPosition(0.75);//change this (was 1)
+            isGrabbed = true;
+        }
+        else if(isGrabbed)
+        {
+            leftTail.setPosition(0.25);
+            rightTail.setPosition(0.48);
+            isGrabbed = false;
+        }
+        telemetry.addData("position: ", isGrabbed);
+    }
+    public void stopped()
+    {
+        right.setPower(0);
+        left.setPower(0);
+        butt.setPower(0);
+        head.setPower(0);
+    }
+    
+    public void printData() 
+    {
+        ssDetected = cam.skystoneD();
+        telemetry.addData("Skystone detected: ", ssDetected);
+        locSkystone = cam.getLocSkystone();
+        telemetry.addData("Skystone: ", locSkystone);
+        
+    }
+
+    /*
+     * Code to run ONCE after the driver hits STOP
+     */
+    @Override
+    public void stop() {
+        //stop camera here
+    }
+
+}
+nomous;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
+
+@Autonomous(name="RED BLOCKS", group="Iterative Opmode")
+
+public class AutonomousRedBlocks extends OpMode
+{
+    // Declare OpMode members.
+    private DcMotor left, right, head, butt, elevator1, elevator2;
+    private Servo leftTail, rightTail, chomper, clamp;
+    private int leftEncoder, rightEncoder, headEncoder, buttEncoder, e1Encoder, e2Encoder;
+    private CameraSetupII cam;
+    private boolean ssDetected, notUsingCamera, isGrabbed;
+    private int locSkystone, counter, step, retrace;
+    private long now, future;
+
+    /*
+     * Code to run ONCE when the driver hits INIT
+     */
+    @Override
+    public void init()
+    {
+        telemetry.addData("Status", "Initialized");
+        
+        try 
+        {
+            left = hardwareMap.get(DcMotor.class, "leftWheel");
+        }
+        catch(Exception e) 
+        {
+            left = null;
+            telemetry.addLine("left is not connected");
+        }
+        try
+        {
+            butt = hardwareMap.get(DcMotor.class, "buttWheel");
+        }
+        catch(Exception e)
+        {
+            butt = null;
+            telemetry.addLine("buttWheel is not connected");
+        }
+        try
+        {
+            right = hardwareMap.get(DcMotor.class,"rightWheel");
+        } 
+        catch(Exception e)
+        {
+            right = null;
+            telemetry.addLine("rightWheel is not connected");
+        }
+        try
+        {
+            head = hardwareMap.get(DcMotor.class,"headWheel");
+        }
+        catch(Exception e)
+        {
+            head = null;
+            telemetry.addLine("headWheel is not connected");
+        }
+        try
+        {
+            elevator1 = hardwareMap.get(DcMotor.class, "elevator1");
+        }
+        catch(Exception e)
+        {
+            elevator1 = null;
+            telemetry.addLine("elevator1 is not connected");
+        }
+        try 
+        {
+            elevator2 = hardwareMap.get(DcMotor.class, "elevator2");
+        }
+        catch(Exception e)
+        {
+            elevator2 = null;
+            telemetry.addLine("elevator2 is not connected");
+        }
+        try
+        {
+            clamp = hardwareMap.get(Servo.class, "clamp");
+        }
+        catch(Exception e)
+        {
+            clamp = null;
+            telemetry.addLine("clamp is not connected");
+        }
+        try {
+            chomper = hardwareMap.get(Servo.class, "chomper2");
+        }
+        catch(Exception e) 
+        {
+            chomper = null;
+            telemetry.addLine("chomper2 is not connected");
+        }
+        try 
+        {
+            leftTail = hardwareMap.get(Servo.class, "leftTail");
+        }
+        catch (Exception e) 
+        {
+            leftTail = null;
+            telemetry.addLine("leftTail is not connected"); 
+        }
+        try
+        {
+            rightTail = hardwareMap.get(Servo.class, "rightTail");
+        }
+        catch(Exception e)
+        {
+            rightTail = null;
+            telemetry.addLine("rightTail is not connected");
+        }
+        cam = new CameraSetupII(telemetry, hardwareMap);
+        cam.activate();
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        
+        counter = 0;
+        notUsingCamera = true;
+        step = 1;
+        retrace = 0;
+        isGrabbed = false;
+        
+        future = -1;
+        
+        telemetry.addData("Status", "Initialized");
+    }
+
+    /*
+     * Code to run REPEATEDLY after the driver hits INIT, but before they hit PLAY
+     */
+    @Override
+    public void init_loop() 
+    {
+        
+    }
+
+    /*
+     * Code to run ONCE when the driver hits PLAY
+     */
+    @Override
+    public void start() 
+    {
+        
+    }
+
+    /*
+     * Code to run REPEATEDLY after the driver hits PLAY but before they hit STOP
+     */
+    @Override
+    public void loop() 
+    {
+        now = System.currentTimeMillis();
+        rightEncoder = right.getCurrentPosition();
+        telemetry.addData("ENCODA NIBBA right: ", rightEncoder);
+        leftEncoder = left.getCurrentPosition();
+        telemetry.addData("ENCODA NIBBAlefy: ", leftEncoder);
+        headEncoder = head.getCurrentPosition();
+        telemetry.addData("head encoder: ", headEncoder);
+        
+        telemetry.addData("retrace = ", retrace);
+        
+        if(step == 1)
+        {
+            drive(1000,0.5);
+        }
+        else if(step == 2)
+        {
+            if(notUsingCamera)
+            {
+                
+                drive(1000, 0.5);
+                notUsingCamera = false;
+            }
+            else
+            {
+                printData();
+            
+                if(ssDetected)
+                {
+                    if(locSkystone == 0)
+                    {
+                        retrace = headEncoder;
+                        stopped();
+                        step = 3;
+                    }
+                    else if(locSkystone == -1)
+                    {
+                        strafePow(-0.1);
+                    }
+                    else
+                    {
+                        strafePow(0.1);
+                    }
+                }
+                else
+                {
+                    strafePow(0.15);
+                }
+            }
+        }
+        else if(step == 3)
+        {
+            drive(1850,0.5);
+        }
+        else if(step == 4)
+        {
+            strafe(-350,0.5);
+            future = now + 1000; 
+            clamp.setPosition(0.55);
+        }
+        else if(step == 5) 
+        {
+            //retrace+=headEncoder;
+            chomp(1);
+        }
+        else if(step == 6)
+        {
+            clampclamp(1);
+        }
+        else if(step == 7)
+        {
+            chomp(.8);
+        }
+        else if(step == 8) 
+        {
+            drive(-750,0.5);
+        }
+        else if(step == 9)
+        {
+            strafe(-(retrace),0.4);
+        }
+        else if(step == 10) 
+        {
+            strafe(4300,1);    
+        }
+        else if(step == 11) 
+        {
+            clampclamp(0.55);
+        }
+        else if(step == 12)
+        {
+            strafe(-1500,1); //might have to be halved
+        }
+        else 
+        {
+            stopped();
+        }
+        telemetry.addData("step ", step);
+        /*if(notUsingCamera)
+        {
+            
+            drive(1000, 0.5);
+            notUsingCamera = false;
+        }
+        else
+        {
+            printData();
+        
+            if(ssDetected)
+            {
+                if(locSkystone == 0)
+                {
+                    stopped();
+                }
+                else if(locSkystone == -1)
+                {
+                    strafePow(-0.1);
+                }
+                else
+                {
+                    strafePow(0.1);
+                }
+            }
+            else
+            {
+                strafePow(0.2);
+            }
+        }
+        */
+        
+        
+        
+        
+        
+        //start with stop as false
+        //red foundation and blocks
+        /*if(stop)
+        {
+            stopped();
+        }
+        else
+        {
+            if(notusingcamera)
+            {
+                if(section == 1) // start with section = 1
+                {
+                    strafeRight(100); //change these encoder values
+                    tailDown();
+                    strafeLeft(100);
+                    strafeRight(50);
+                    turnRight(); // turn 90 degrees using gyro
+                    notusingcamera = false;
+                }
+                else if(section == 2)
+                {
+                    counter++; //skystone grabbed 
+                    drive(45,0.5); //+ for forward, - for backwards
+                    openClamp(); // you can make a method to grab block
+                    chompDown();
+                    closeClamp();
+                    backward(45);
+                    strafeRight(); // use encoder number from when the robot starts detecting
+                    openClamp(); // you can make a method to release block
+                    strafeLeft(10); // strafe out of block
+                    notusingcamera = false;
+                    if(counter == 2)
+                    {
+                        // use color detector to park
+                        stop = true;
+                    }
+                }
+            }
+            else // !notusingcamera
+            {
+                if(ssDetected)
+        {
+            if(locSkystone == 0)
+            {
+                stopped();
+                section = 2;
+            }
+            else if(locSkystone == -1)
+            {
+                strafePow(-0.1);
+            }
+            else
+            {
+                strafePow(0.1);
+            }
+        }
+        else
+        {
+            strafePow(0.2);
+        }
+                //when robot finds it set section = 2 and notusingcamera = true
+            }
+        }
+        */
+
+    }
+    public void setMotorMode(DcMotor.RunMode mode) 
+    {
+        left.setMode(mode);
+        right.setMode(mode);
+        head.setMode(mode);
+        butt.setMode(mode);
+        elevator1.setMode(mode);
+        elevator2.setMode(mode);
+    }
+    public void tailDown()
+    {
+        // set position here
+    }
+    public void tailUp()
+    {
+        // set position
+    }
+    public void chomp(double pos)
+    {
+        chomper.setPosition(pos);
+        if(now >= future)
+        {
+            future = now + 1000;
+            step++;
+        }
+    }
+    public void clampclamp(double pos)
+    {
+        clamp.setPosition(pos);
+        if(now >= future)
+        {
+            future = now + 1000;
+            step++;
+        }
+    }/*
+    public void turnRight()
+    {
+        
+    }
+    public void turnLeft()
+    {
+        
+    }
+    */
+    public void strafePow(double pow)
+    {
+        left.setPower(0);
+        right.setPower(0);
+        butt.setPower(pow);
+        head.setPower(-pow);
+    }
+    public void drive(int encoder, double pow)
+    {
+        if(encoder>0 && right.getCurrentPosition() <= encoder) 
+        {
+            left.setPower(-pow);
+            right.setPower(pow);
+        }
+        else if(encoder<0 && right.getCurrentPosition() >= encoder)
+        {
+            left.setPower(pow);
+            right.setPower(-pow);
+        }
+        else 
+        {
+            left.setPower(0);
+            right.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    //right = +, left = - 
+    public void strafe(int encoder, double pow)
+    {
+        if(encoder<0 && head.getCurrentPosition() >= encoder)
+        {
+            head.setPower(-pow);
+            butt.setPower(pow);
+        }
+        else if(encoder>0 && head.getCurrentPosition() <= encoder) 
+        {
+            head.setPower(pow);
+            butt.setPower(-pow);
+        }
+        else 
+        {
+            head.setPower(0);
+            butt.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    public void prehensileTail()
+    {
+        if(!isGrabbed)
+        {
+            leftTail.setPosition(0);
+            rightTail.setPosition(0.75);//change this (was 1)
+            isGrabbed = true;
+        }
+        else if(isGrabbed)
+        {
+            leftTail.setPosition(0.25);
+            rightTail.setPosition(0.48);
+            isGrabbed = false;
+        }
+        telemetry.addData("position: ", isGrabbed);
+    }
+    public void stopped()
+    {
+        right.setPower(0);
+        left.setPower(0);
+        butt.setPower(0);
+        head.setPower(0);
+    }
+    
+    public void printData() 
+    {
+        ssDetected = cam.skystoneD();
+        telemetry.addData("Skystone detected: ", ssDetected);
+        locSkystone = cam.getLocSkystone();
+        telemetry.addData("Skystone: ", locSkystone);
+        
+    }
+
+    /*
+     * Code to run ONCE after the driver hits STOP
+     */
+    @Override
+    public void stop() {
+        //stop camera here
+    }
+
+}
