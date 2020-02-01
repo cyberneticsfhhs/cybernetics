@@ -1,0 +1,719 @@
+//Autonmous 2018
+//Copyright 2019 FIRST Tech Challenge Team 14424
+
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.hardware.Servo;
+import org.firstinspires.ftc.robotcore.external.hardware.camera.Camera;
+import java.util.Locale;
+import org.firstinspires.ftc.robotcore.external.navigation.Position;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.util.ElapsedTime;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import com.qualcomm.hardware.bosch.BNO055IMU;
+import com.qualcomm.hardware.bosch.JustLoggingAccelerationIntegrator;
+
+import org.firstinspires.ftc.robotcore.external.Func;
+import org.firstinspires.ftc.robotcore.external.navigation.Acceleration;
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
+import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
+import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+import org.firstinspires.ftc.robotcore.external.navigation.Position;
+import org.firstinspires.ftc.robotcore.external.navigation.Velocity;
+
+@Autonomous
+
+public class AutonomousBasic extends OpMode {
+    private DcMotor leftBack, rightBack, leftFront, rightFront;
+    private DcMotor liftBot, liftArm;
+    private Servo marker;
+    private CameraSetup cam;
+    private int step, posOfGold;
+    private int turnTicks;
+    private double currAngle;
+    private double turnAngle;
+    private boolean gyroReady;
+    private int ticks, missingSide,initFor;
+    private double missingAngle, targetAngle;
+    private boolean lookedLeft;
+    
+    // The IMU sensor object & state used for updating telemetry
+    BNO055IMU imu;
+    Orientation angles;
+    Acceleration gravity;
+    @Override
+    public void init() {
+        telemetry.addData("Status", "Initialized");
+
+        //MOTORS
+        try {
+            leftBack = hardwareMap.get(DcMotor.class,"leftBack");
+            leftBack.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftBack.setDirection(DcMotorSimple.Direction.REVERSE);
+        }
+        catch(Exception e) {
+            telemetry.addLine("leftBack not connected");
+            leftBack = null;
+        }
+        try {
+            rightBack = hardwareMap.get(DcMotor.class,"rightBack");
+            rightBack.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightBack.setDirection(DcMotorSimple.Direction.FORWARD);
+        }
+        catch(Exception e) {
+            telemetry.addLine("rightBack not connected");
+            rightBack = null;
+        }
+        try {
+            leftFront = hardwareMap.get(DcMotor.class,"leftFront");
+            leftFront.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftFront.setDirection(DcMotorSimple.Direction.REVERSE);
+        }
+        catch(Exception e) {
+            telemetry.addLine("leftFront not connected");
+            leftFront = null;
+        }
+        try {
+            rightFront = hardwareMap.get(DcMotor.class,"rightFront");
+            rightFront.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightFront.setDirection(DcMotorSimple.Direction.FORWARD);
+        }
+        catch(Exception e) {
+            telemetry.addLine("rightFront not connected");
+            rightFront = null;
+        }
+        try {
+            liftBot = hardwareMap.get(DcMotor.class,"liftBot");
+            liftBot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+        catch (Exception e) {
+            telemetry.addLine("liftBot not connected");
+            liftBot = null;
+        }
+        try {
+            liftArm = hardwareMap.get(DcMotor.class,"liftArm");
+            liftArm.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+        catch (Exception e) {
+            telemetry.addLine("liftArm is not connected");
+            liftArm = null;
+        }
+        
+        leftBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightBack.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightFront.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        liftBot.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        try {
+            marker = hardwareMap.get(Servo.class,"marker");
+        }
+        catch(Exception e) {
+            telemetry.addLine("marker is not connnected");
+            marker = null;
+        }
+        
+        telemetry.update();
+        
+        cam = new CameraSetup(telemetry, hardwareMap);
+        cam.activate();
+        
+        posOfGold = -3000;
+        
+        step = 0;
+        gyroReady = false;
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        
+        turnTicks = 0; 
+        currAngle = -99000;
+        turnAngle = 30;
+        ticks = 2300;
+        missingSide = -99000;
+        missingAngle = -99000;
+        targetAngle = -99000;
+        initFor = 1400;
+        
+        lookedLeft = false;
+    }
+    
+    public void setUpGyro()
+    {
+        //ANGLES
+        BNO055IMU.Parameters parameters = new BNO055IMU.Parameters();
+        parameters.angleUnit = BNO055IMU.AngleUnit.DEGREES;
+        parameters.accelUnit = BNO055IMU.AccelUnit.METERS_PERSEC_PERSEC;
+        parameters.calibrationDataFile = "BNO055IMUCalibration.json"; // see the calibration sample opmode
+        parameters.loggingEnabled = true;
+        parameters.loggingTag = "IMU";
+        parameters.accelerationIntegrationAlgorithm = new JustLoggingAccelerationIntegrator();
+        // Retrieve and initialize the IMU. We expect the IMU to be attached to an I2C port
+        // on a Core Device Interface Module, configured to be a sensor of type "AdaFruit IMU",
+        // and named "imu".
+        imu = hardwareMap.get(BNO055IMU.class, "imu");
+        imu.initialize(parameters);
+
+        // Set up our telemetry dashboard
+        composeTelemetry();
+    }
+    
+    @Override
+    public void init_loop() {
+        displayMotorData();
+    }
+    
+    @Override
+    public void start() {
+        displayMotorData();
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        liftBot.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        liftBot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+    }
+
+    @Override
+    public void loop() {
+        //setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        //setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        if(gyroReady == true)
+            currAngle = getAngle(angles.angleUnit, angles.firstAngle);
+        displayMotorData();
+        telemetry.addData("Step pOOP:",step);
+        if(step == 0){
+            botDown(9000,0.6); //10119-450
+        }
+        else if(step == 1) {
+            //strafeLeft(300,0.5);
+            turn(150,0.5);
+        }
+        else if(step == 2){
+            drive(200,0.5);
+        }
+        else if(step == 3) {
+            turn(-150,0.5);
+        }
+        else if(step == 4) {
+            setUpGyro();
+            imu.startAccelerationIntegration(new Position(),new Velocity(), 1000);
+            gyroReady = true;
+            step=5;
+        }//TESTING
+        /*else if(step == 4) {
+            //drive(2300,0.3);
+            missingSide = getMissingSide();
+            missingAngle = convertToDeg(getAngle(missingSide));
+            if(currAngle > 0){
+                targetAngle = -(currAngle+missingAngle);
+            }
+            else{
+                targetAngle = -(currAngle-missingAngle);
+            }
+        }*/
+        else if(step == 5) {
+            //currAngle = getAngle(angles.angleUnit, angles.firstAngle);
+            
+            telemetry.update();
+            setMotorMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            posOfGold = cam.getLocOfYellow();
+            boolean centerGold = cam.centerGold();
+            telemetry.addData("center gold ",centerGold);
+            
+            telemetry.addData("pos of gold",posOfGold);
+       
+            int distFromC = cam.distBetween();
+            telemetry.addData("distance from center", distFromC);
+                if(centerGold==true){
+                    turnAngle = currAngle;
+                    if(turnAngle > 0)
+                        turnAngle-=3;
+                    else
+                        turnAngle+=3;
+                    telemetry.addData("turnAngle",turnAngle);
+                    missingSide = getMissingSide();
+                    missingAngle = 180-convertToDeg(getAngle(missingSide));
+                    if(currAngle > 0){
+                        targetAngle = (currAngle+missingAngle) - 180;
+                    }
+                    else{
+                        targetAngle = (currAngle-missingAngle) + 180;
+                    }
+                    setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    
+                    step=6;
+                    telemetry.addLine("Gold is in center");
+                }
+                else {
+                    telemetry.addLine("Gold is not in center");
+                    telemetry.addData("pos of gold",posOfGold);
+                    if( distFromC < 0 && posOfGold != -3000)
+                    {
+                        telemetry.addLine("TURNING LEFT");
+                        turnLeftPow(0.17);
+                    }                   
+                    else if( distFromC > 0 && posOfGold != -3000)
+                    {
+                        telemetry.addLine("TURNING RIGHT");
+                        turnRightPow(0.17);
+                    }
+                    else { //not on screen
+                        if(!lookedLeft) {
+                            if(currAngle <= 60)
+                                turnLeftPow(0.17);
+                            else {
+                                lookedLeft = true;
+                            }
+                        }
+                        else {
+                            turnRightPow(0.17);
+                        }
+                    }
+               
+                }
+        }
+        else if(step == 6) {
+            telemetry.addLine("DRIVING FORWARD AHHH");
+            drive(initFor,0.3);//if we change the encoder here change in math methods
+        }
+        else if(step == 7) {
+            turnTo(targetAngle,0.04);   
+        }
+        else if(step == 8) {
+            drive(missingSide,0.3);
+        }
+        else if(step == 9) {
+            turnTo(-45,0.04);
+        }
+        else if(step == 10) {
+            placeMarker();
+        }
+        else if(step == 11) {
+            turnTo(45,0.04);
+        }
+        else if(step == 12) {
+            drive(-3800,0.3);
+        }
+        else {
+            motorStop();
+        }
+    }
+    
+    //DISPLAY METHODS
+    public void setMotorMode(DcMotor.RunMode mode) {
+        leftBack.setMode(mode);
+        rightFront.setMode(mode);
+        rightBack.setMode(mode);
+        leftFront.setMode(mode);
+    }
+    public void displayMotorData() { //finish up
+        telemetry.addData("step ",step);
+        telemetry.addData("angle", currAngle);
+        telemetry.addData("turnAngle",turnAngle);
+        telemetry.addData("missingSide",missingSide);
+        telemetry.addData("missingAngle",missingAngle);
+        telemetry.addData("targetAngle",targetAngle);
+
+        if(leftFront!=null)
+            telemetry.addData("leftFront Encoder:",leftFront.getCurrentPosition());
+        else
+            telemetry.addData("leftFront Encoder:","not connected");
+            
+        if(rightFront!=null)
+            telemetry.addData("rightFront Encoder:",rightFront.getCurrentPosition());
+        else
+            telemetry.addData("rightFront Encoder:","not connected");
+            
+        if(leftBack!=null)
+            telemetry.addData("leftBack Encoder:", leftBack.getCurrentPosition());
+        else
+            telemetry.addData("leftBack Encoder:","not connected");
+            
+        if(rightBack!=null)
+            telemetry.addData("rightBack Encoder:", rightBack.getCurrentPosition());
+        else
+            telemetry.addData("rightBack Encoder:", "not connected");
+            
+        if(liftBot!=null)
+            telemetry.addData("liftBot Encoder:", liftBot.getCurrentPosition());
+        else
+            telemetry.addData("liftBot Encoder:", "not connected");
+        telemetry.update();
+    }
+    
+    //MATH METHODS
+    public double convertToRad(double a)
+    {
+        return a*Math.PI/180;
+    }
+    public double convertToDeg(double rad)
+    {
+        return rad*180/Math.PI;
+    }
+    public int getMissingSide() {
+        int c = (int)Math.sqrt((initFor*initFor)+(ticks*ticks) - (2*initFor)*ticks*Math.cos(convertToRad(Math.abs(turnAngle))));
+        return c;
+    }
+    public double getAngle(int missSide) {
+        return (Math.asin(ticks*Math.sin(convertToRad(Math.abs(turnAngle)))/missSide));
+    }
+    //DRIVING METHOD
+    //forward is pos, backward is neg
+    public void drive(int encoder, double pow)
+    {
+        if(encoder>0&&leftFront.getCurrentPosition()<=encoder) {
+            leftFront.setPower(pow);
+            rightFront.setPower(pow);
+            leftBack.setPower(pow);
+            rightBack.setPower(pow);
+        }
+        else if(encoder<0 && leftFront.getCurrentPosition() >= encoder)
+        {
+            leftFront.setPower(-pow);
+            rightFront.setPower(-pow);
+            leftBack.setPower(-pow);
+            rightBack.setPower(-pow);
+        }
+        else {
+            leftFront.setPower(0);
+            rightFront.setPower(0);
+            leftBack.setPower(0);
+            rightBack.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    //TURNING METHODS
+    //right is pos,left is neg
+    public void turn(int encoder, double pow) {
+        if(encoder>0&&leftFront.getCurrentPosition()<=encoder) {
+                leftFront.setPower(pow);
+                rightFront.setPower(-pow);
+                leftBack.setPower(pow);
+                rightBack.setPower(-pow);
+            }
+        else if(encoder<0&&leftFront.getCurrentPosition()>=encoder) {
+            leftFront.setPower(-pow);
+            rightFront.setPower(pow);
+            leftBack.setPower(-pow);
+            rightBack.setPower(pow);
+        }
+        else {
+                leftFront.setPower(0);
+                rightFront.setPower(0);
+                leftBack.setPower(0);
+                rightBack.setPower(0);
+                setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                step++;
+            }
+    }
+    //ANGLE TURNING METHODS
+    public void turnTo(double deg, double pow) {
+        currAngle = getAngle(angles.angleUnit, angles.firstAngle);
+        if(deg<0 && currAngle > deg || deg == 0 && currAngle > 6)// && currAngle < 6) {//turn right
+        {
+            leftFront.setPower(pow);
+            rightFront.setPower(-pow);
+            leftBack.setPower(pow);
+            rightBack.setPower(0);//neg pow
+        }
+        else if(deg>0 && currAngle < deg || deg == 0 && currAngle < -6)// && currAngle > -6) {//turn left
+        {
+            leftFront.setPower(-pow);
+            rightFront.setPower(pow);
+            leftBack.setPower(-pow);
+            rightBack.setPower(0);//pow
+        }
+        else {
+            leftFront.setPower(0);
+            rightFront.setPower(0);
+            leftBack.setPower(0);
+            rightBack.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    //TURNING POWER
+    public void turnRightPow(double pow) {
+        leftFront.setPower(pow);
+        rightFront.setPower(-pow);
+        leftBack.setPower(pow);
+        rightBack.setPower(-pow);
+    } 
+    public void turnLeftPow(double pow) {
+        leftFront.setPower(-pow);
+        rightFront.setPower(pow);
+        leftBack.setPower(-pow);
+        rightBack.setPower(pow);
+    }
+    
+    public void driveForward(int encoder,double pow) {
+        if(encoder>0&&leftFront.getCurrentPosition()<=encoder) {
+            leftFront.setPower(pow);
+            rightFront.setPower(pow);
+            leftBack.setPower(pow);
+            rightBack.setPower(pow);
+        }
+        else {
+            leftFront.setPower(0);
+            rightFront.setPower(0);
+            leftBack.setPower(0);
+            rightBack.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+        
+    }
+    public void driveBackward(int encoder, double pow) {
+        if(leftFront.getCurrentPosition()>=-encoder) { //if(leftFront.getCurrentPosition()
+            leftFront.setPower(-pow);
+            rightFront.setPower(-pow);
+            leftBack.setPower(-pow);
+            rightBack.setPower(-pow);
+        }
+        else {
+            leftFront.setPower(0);
+            rightFront.setPower(0);
+            leftBack.setPower(0);
+            rightBack.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    
+    public void turnRight(int encoder, double pow) {
+        if(encoder>0)
+        {
+            if(leftFront.getCurrentPosition()<=encoder) {
+                leftFront.setPower(pow);
+                rightFront.setPower(-pow);
+                leftBack.setPower(pow);
+                rightBack.setPower(-pow);
+            }
+            else {
+                leftFront.setPower(0);
+                rightFront.setPower(0);
+                leftBack.setPower(0);
+                rightBack.setPower(0);
+                setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                step++;
+            }
+        }
+        else
+        {//not tested
+            if(leftFront.getCurrentPosition()>=-encoder) {
+                leftFront.setPower(pow);
+                rightFront.setPower(-pow);
+                leftBack.setPower(pow);
+                rightBack.setPower(-pow);
+            }
+            else {
+                leftFront.setPower(0);
+                rightFront.setPower(0);
+                leftBack.setPower(0);
+                rightBack.setPower(0);
+                setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                step++;
+            }
+        }
+    }
+    
+    public void turnLeft(int encoder, double pow) {
+        if(leftFront.getCurrentPosition()>=-encoder) {
+            leftFront.setPower(-pow);
+            rightFront.setPower(pow);
+            leftBack.setPower(-pow);
+            rightBack.setPower(pow);
+        }
+        else{
+            leftFront.setPower(0);
+            rightFront.setPower(0);
+            leftBack.setPower(0);
+            rightBack.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    //STRAFE RIGHT
+    public void strafeRight (int encoder, double pow) {
+        if(leftFront.getCurrentPosition()<=encoder) {
+            leftFront.setPower(pow);
+            rightFront.setPower(-pow);
+            leftBack.setPower(-pow);
+            rightBack.setPower(pow);
+        }
+        else{
+            leftFront.setPower(0);
+            rightFront.setPower(0);
+            leftBack.setPower(0);
+            rightBack.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    //STRAFE LEFT
+    public void strafeLeft (int encoder, double pow) {
+        if(leftFront.getCurrentPosition()>=-encoder) {
+            leftFront.setPower(-pow);
+            rightFront.setPower(pow);
+            leftBack.setPower(pow);
+            rightBack.setPower(-pow);
+        }
+        else{
+            leftFront.setPower(0);
+            rightFront.setPower(0);
+            leftBack.setPower(0);
+            rightBack.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    //LATCH
+    public void botUp (int encoder, double pow) {
+        if(liftBot.getCurrentPosition() >= -encoder) {
+            liftBot.setPower(-pow);
+        }
+        else{
+            liftBot.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    public void botDown (int encoder, double pow) {
+        if(liftBot.getCurrentPosition() <= encoder) {
+            liftBot.setPower(pow);
+        }
+        else{
+            liftBot.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            step++;
+        }
+    }
+    /*public void placeMarker(int encoder) {
+        if(liftArm.getCurrentPosition() <= encoder) {
+            liftArm.setPower(0.5);
+        }
+        else {
+            liftBot.setPower(0);
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+    }*/
+    public void placeMarker() {
+        marker.setPosition(1);
+        step++;
+    }
+
+    public void motorStop() {
+        leftFront.setPower(0);
+        rightFront.setPower(0);
+        leftBack.setPower(0);
+        rightBack.setPower(0);
+    }
+    public void displayMineralData() {
+        boolean centerGold = cam.centerGold();
+        telemetry.addData("center gold:",centerGold);
+        int posGold = cam.getLocOfYellow();
+        telemetry.addData("Position of Gold",posGold);
+        int distFromCenter = cam.distBetween();
+        telemetry.addData("Distance from Gold", distFromCenter);
+    }
+    void composeTelemetry() {
+
+        // At the beginning of each telemetry update, grab a bunch of data
+        // from the IMU that we will then display in separate lines.
+        telemetry.addAction(new Runnable() { @Override public void run()
+                {
+                // Acquiring the angles is relatively expensive; we don't want
+                // to do that in each of the three items that need that info, as that's
+                // three times the necessary expense.
+                angles   = imu.getAngularOrientation(AxesReference.INTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES);
+                gravity  = imu.getGravity();
+                }
+            });
+
+        telemetry.addLine()
+            .addData("status", new Func<String>() {
+                @Override public String value() {
+                    return imu.getSystemStatus().toShortString();
+                    }
+                })
+            .addData("calib", new Func<String>() {
+                @Override public String value() {
+                    return imu.getCalibrationStatus().toString();
+                    }
+                });
+
+        telemetry.addLine()
+            .addData("heading", new Func<String>() {
+                @Override public String value() {
+                    return formatAngle(angles.angleUnit, angles.firstAngle);
+                    }
+                })
+            .addData("roll", new Func<String>() {
+                @Override public String value() {
+                    return formatAngle(angles.angleUnit, angles.secondAngle);
+                    }
+                })
+            .addData("pitch", new Func<String>() {
+                @Override public String value() {
+                    return formatAngle(angles.angleUnit, angles.thirdAngle);
+                    }
+                });
+
+        telemetry.addLine()
+            .addData("grvty", new Func<String>() {
+                @Override public String value() {
+                    return gravity.toString();
+                    }
+                })
+            .addData("mag", new Func<String>() {
+                @Override public String value() {
+                    return String.format(Locale.getDefault(), "%.3f",
+                            Math.sqrt(gravity.xAccel*gravity.xAccel
+                                    + gravity.yAccel*gravity.yAccel
+                                    + gravity.zAccel*gravity.zAccel));
+                    }
+                });
+    }
+
+    //----------------------------------------------------------------------------------------------
+    // Formatting
+    //----------------------------------------------------------------------------------------------
+
+    String formatAngle(AngleUnit angleUnit, double angle) {
+        return formatDegrees(AngleUnit.DEGREES.fromUnit(angleUnit, angle));
+    }
+
+    String formatDegrees(double degrees){
+        return String.format(Locale.getDefault(), "%.1f", AngleUnit.DEGREES.normalize(degrees));
+    }
+    public double getAngle(AngleUnit angleUnit, double angle) {
+        return AngleUnit.DEGREES.normalize(AngleUnit.DEGREES.fromUnit(angleUnit, angle));
+    }
+    @Override
+    public void stop() {
+        cam.deactivate();
+        motorStop();
+    }
+}
