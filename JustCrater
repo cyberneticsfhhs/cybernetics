@@ -1,0 +1,576 @@
+//Autonomous 2018
+/*
+Copyright 2016 FIRST Tech Challenge Team 14424
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute,
+sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
+NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.util.ElapsedTime;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+/**
+ * This file contains an example of an iterative (Non-Linear) "OpMode".
+ * An OpMode is a 'program' that runs in either the autonomous or the teleop period of an FTC match.
+ * The names of OpModes appear on the menu of the FTC Driver Station.
+ * When an selection is made from the menu, the corresponding OpMode
+ * class is instantiated on the Robot Controller and executed.
+ *
+ * Remove a @Disabled the on the next line or two (if present) to add this opmode to the Driver Station OpMode list,
+ * or add a @Disabled annotation to prevent this OpMode from being added to the Driver Station
+ */
+@Autonomous(name="Autonomous JustCrater", group="Iterative Opmode")
+
+public class JustCrater extends OpMode
+{
+    // Declare OpMode members.
+    private ElapsedTime timer = new ElapsedTime();
+    private DcMotor leftBackMotor, rightBackMotor, leftFrontMotor, rightFrontMotor;
+    private DcMotor liftMotor;
+    private BoringCamera cam;
+    private int posOfY;
+    public boolean ididsomething = false;
+    public boolean notUsingCamera = true;
+    public boolean beforeCamera = true;
+    private boolean stop = false;
+    private boolean iTurned = false;
+    private int turnTicks = 0;
+    /*
+     * Code to run ONCE when the driver hits INIT
+     */
+    @Override
+    public void init() {
+    
+        telemetry.addData("Status", "Initialized");
+        try{
+            leftBackMotor = hardwareMap.get(DcMotor.class, "leftBack" );
+            leftBackMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftBackMotor.setDirection(DcMotorSimple.Direction.FORWARD);
+        }
+        catch(Exception e){
+            telemetry.addLine("leftBack is not connected");
+            leftBackMotor = null;//means no reference
+        }
+        try{
+            rightBackMotor = hardwareMap.get(DcMotor.class, "rightBack" );
+            rightBackMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightBackMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        }
+        catch(Exception e){
+            telemetry.addLine("rightBack is not connected");
+            rightBackMotor=null;
+        }
+        try{
+            leftFrontMotor = hardwareMap.get(DcMotor.class, "leftFront");
+            leftFrontMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftFrontMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+        }
+        catch(Exception e){
+            telemetry.addLine("leftFront is not connected");
+            leftFrontMotor=null;
+        }
+        try{
+            rightFrontMotor = hardwareMap.get(DcMotor.class, "rightFront");
+            rightFrontMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightFrontMotor.setDirection(DcMotorSimple.Direction.FORWARD);
+        }
+        catch(Exception e){
+            telemetry.addLine("rightFront is not connected");
+            rightFrontMotor=null;
+        }
+        try{
+            liftMotor = hardwareMap.get(DcMotor.class, "liftBot");
+            liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        }
+        catch(Exception e){
+            telemetry.addLine("liftBot is not connected");
+            liftMotor=null;
+        }
+        leftBackMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightBackMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftFrontMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightFrontMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        
+        //setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        //setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+        
+        cam = new BoringCamera(telemetry,hardwareMap);
+        cam.activate();
+        /*posOfY = -9;
+        posOfY = cam.getLocOfYellow();
+        telemetry.addData("pos of gold",posOfY);
+        telemetry.addLine("Finished init");*/
+        
+    }
+
+    /*
+     * Code to run REPEATEDLY after the driver hits INIT, but before they hit PLAY
+     */
+    @Override
+    public void init_loop()
+    {
+        telemetry.addData("encoders: ", leftBackMotor.getCurrentPosition());
+        telemetry.addData("encoders: ", rightBackMotor.getCurrentPosition());
+        telemetry.addData("encoders: ", leftFrontMotor.getCurrentPosition());
+        telemetry.addData("encoders: ", rightFrontMotor.getCurrentPosition());
+        //setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        telemetry.addData("liftMotor: ", liftMotor.getCurrentPosition());
+    }
+
+    /*
+     * Code to run ONCE when the driver hits PLAY
+     */
+    @Override
+    public void start() 
+    {
+        timer.reset();
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+        liftMotor.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        liftMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        turnTicks = 0;
+    }
+    
+    public void printData(){
+        boolean centerGold = cam.centerGold();
+            telemetry.addData("center gold ",centerGold);
+            posOfY = cam.getLocOfYellow();
+            telemetry.addData("pos of gold",posOfY);
+            
+        int distFromC=cam.distBetween();
+            telemetry.addData("diet from center",distFromC);
+            
+            //setMotorMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            //turnLeftPow(0.5);
+    }
+    
+    public void loop4()
+    {
+        boolean centerGold = cam.centerGold();
+        telemetry.addData("center gold ",centerGold);
+        posOfY = cam.getLocOfYellow();
+        telemetry.addData("pos of gold",posOfY);
+   
+        int distFromC = cam.distBetween();
+        telemetry.addData("distance from center", distFromC);
+            if(centerGold==true && !ididsomething){
+                setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+                driveForward(1000);
+                telemetry.addLine("centerGold is true");
+                ididsomething = true;
+            }
+            else {
+                telemetry.addLine("centerGold is false");
+                if(posOfY == -1 || distFromC < 0 && !ididsomething)
+                {
+                    telemetry.addLine("TURNING LEFT pls join my relgion");
+                    turnLeftPow(0.18);
+                }                
+                else //if(posOfY == 1 || distFromC > 0 && !ididsomething)
+                {
+                    telemetry.addLine("TURNING RIGHT put it in rice");
+                    turnRightPow(0.18);
+                }
+           
+            }
+            if(ididsomething){
+                stopped();
+                telemetry.addLine("walid help GOODNIGHT STREAKS");
+                setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+                beforeCamera = false;
+                notUsingCamera = true;
+            }
+    
+    }
+    /* CASE FOR PLACING MARKER WHEN IN FRONT OF THE CRATER
+               driveBackward(1000); //back to starting point
+                //if statement->rotates depending of position of mineral
+               driveForward(990);
+               turnLeft(120); //abt a lil ovr 90 degrees
+               driveForward(2000); //reach box
+               turnRight(90); //face box
+               //placeMarker();
+               turnRight(120); //face crater
+               driveForward(2000);
+               //or 
+               driveBackward(2000);
+    }*/
+    /*
+     * Code to run REPEATEDLY after the driver hits PLAY but before they hit STOP
+     */
+    @Override
+    public void loop() 
+    {
+        telemetry.addData("encoders: ", leftBackMotor.getCurrentPosition());
+        telemetry.addData("encoders: ", rightBackMotor.getCurrentPosition());
+        telemetry.addData("encoders: ", leftFrontMotor.getCurrentPosition());
+        telemetry.addData("encoders: ", rightFrontMotor.getCurrentPosition());
+        telemetry.addData("encoders: ", liftMotor.getCurrentPosition());
+        
+       if(stop)
+       {
+           stopped();
+        }
+        else if(notUsingCamera){ 
+           if(beforeCamera){
+                botDown(10269);
+                if(!notUsingCamera){
+                    strafeLeft(100);
+                    driveForward(175);
+                    strafeRight(100);
+                    setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    notUsingCamera = false;
+                }
+           }
+           else{
+               if(!iTurned) {
+                  driveForward(250);//play with this number so it ges us to the same place
+               }
+               else{
+                   turnLeft(-turnTicks*2);
+                   driveForward(250);//this must match the distance travled forward erarlier
+                   turnLeft(turnTicks);
+                   stop = true;
+               }
+           }
+       }
+       else { //(!notUsingCamera)
+            setMotorMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            
+            boolean centerGold = cam.centerGold();
+            telemetry.addData("center gold ",centerGold);
+            posOfY = cam.getLocOfYellow();
+            telemetry.addData("pos of gold",posOfY);
+       
+            int distFromC = cam.distBetween();
+            telemetry.addData("distance from center", distFromC);
+                if(centerGold==true && !ididsomething){
+                    turnTicks = rightFrontMotor.getCurrentPosition();
+                    setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    driveForward(700);
+                    telemetry.addLine("centerGold is true");
+                    ididsomething = true;
+                }
+                else {
+                    telemetry.addLine("centerGold is false");
+                    iTurned = true;
+                    if( distFromC < 0 && !ididsomething)
+                    {
+                        telemetry.addLine("TURNING LEFT pls join my relgion");
+                        turnLeftPow(0.2);
+                    }                
+                    else //if( distFromC > 0 && !ididsomething)
+                    {
+                        telemetry.addLine("TURNING RIGHT put it in rice");
+                        turnRightPow(0.2);
+                    }
+               
+                }
+                if(ididsomething){
+                    stopped();
+                    telemetry.addLine("walid help GOODNIGHT STREAKS");
+                    setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    beforeCamera = false;
+                    notUsingCamera = true;
+                }
+        }
+    }
+    /*public void futureLoop()
+    {
+        telemetry.addData("",step);
+        if(step == 1)
+        {
+            //telemetry.addLine(step);
+            botDown(6824);
+            step = 2;
+        }
+        else if(step == 2)
+        {
+            telemetry.addData("",step);
+            strafeLeft(100);
+            driveForward(200);
+            strafeRight(100);
+            step = 3;
+        }
+        else if(step == 3)
+        {
+            telemetry.addData("",step);
+            boolean centerGold = cam.centerGold();
+            telemetry.addData("center gold ",centerGold);
+            posOfY = cam.getLocOfYellow();
+            telemetry.addData("pos of gold",posOfY);
+       
+            int distFromC = cam.distBetween();
+            telemetry.addData("distance from center", distFromC);
+                if(centerGold==true && !ididsomething){
+                    setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    driveForward(1000);
+                    telemetry.addLine("centerGold is true");
+                    ididsomething = true;
+                }
+                else {
+                    telemetry.addLine("centerGold is false");
+                    if(posOfY == -1 || distFromC < 0 && !ididsomething)
+                    {
+                        telemetry.addLine("TURNING LEFT pls join my relgion");
+                        turnLeftPow(0.5);
+                    }                
+                    else //if(posOfY == 1 || distFromC > 0 && !ididsomething)
+                    {
+                        telemetry.addLine("TURNING RIGHT put it in rice");
+                        turnRightPow(0.5);
+                    }
+               
+                }
+                if(ididsomething){
+                    stopped();
+                    telemetry.addLine("walid help GOODNIGHT STREAKS");
+                    setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+                    beforeCamera = false;
+                    notUsingCamera = true;
+                    step = 4;
+                }
+            }
+        }
+    }*/
+    
+    //TURNING
+    public void turnRightPow(double pow) {
+        leftBackMotor.setPower(pow);
+        leftFrontMotor.setPower(pow);
+        rightBackMotor.setPower(-pow);
+        rightFrontMotor.setPower(-pow);
+    }
+    public void turnLeftPow(double pow) {
+        leftBackMotor.setPower(-pow); 
+        leftFrontMotor.setPower(-pow);
+        rightBackMotor.setPower(pow);
+        rightFrontMotor.setPower(pow);
+    }
+    
+    public void turnRight(int encoder) {
+        leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() - encoder);
+        rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() - encoder);
+        leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        
+        while(isMotorBusy()) {
+            leftBackMotor.setPower(0.6); 
+            leftFrontMotor.setPower(0.6);
+            rightBackMotor.setPower(0.6);
+            rightFrontMotor.setPower(0.6);
+        }
+        
+        leftBackMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        rightBackMotor.setPower(0);
+        leftFrontMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    public void turnLeft(int encoder) {
+        leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() - encoder);
+        rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() - encoder);
+        
+        while(isMotorBusy()) {
+            leftBackMotor.setPower(0.6); 
+            leftFrontMotor.setPower(0.6);
+            rightBackMotor.setPower(0.6);
+            rightFrontMotor.setPower(0.6);
+        }
+        
+        leftBackMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        rightBackMotor.setPower(0);
+        leftFrontMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    /*
+     * Code to run ONCE after the driver hits STOP
+     */
+    
+    //FOWARDS
+    public boolean isMotorBusy() {
+        return leftBackMotor.isBusy() && rightFrontMotor.isBusy() && rightBackMotor.isBusy() && leftFrontMotor.isBusy();
+    }
+    public void driveForward(int encoder) {
+        leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        
+        while(isMotorBusy()) {
+            leftBackMotor.setPower(1); //change speed
+            rightFrontMotor.setPower(1);
+            rightBackMotor.setPower(1);
+            leftFrontMotor.setPower(1);
+        }
+        
+        leftBackMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        rightBackMotor.setPower(0);
+        leftFrontMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    //BACKWARDS
+    public void driveBackward(int encoder) {
+        leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() - encoder);
+        rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() - encoder);
+        rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() - encoder);
+        leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() - encoder);
+        
+        while(isMotorBusy()) {
+            leftBackMotor.setPower(1);
+            rightFrontMotor.setPower(1);
+            rightBackMotor.setPower(1);
+            leftFrontMotor.setPower(1);
+        }
+        leftBackMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        rightBackMotor.setPower(0);
+        leftFrontMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    //STRAFING
+    public void strafeRight(int encoder) {
+        leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() - encoder);
+        rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() - encoder);
+        rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        
+        while(isMotorBusy()) {
+            //right go inward and left go outward
+            leftBackMotor.setPower(1);
+            rightFrontMotor.setPower(1);
+            rightBackMotor.setPower(1);
+            leftFrontMotor.setPower(1);
+        }
+        leftBackMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        rightBackMotor.setPower(0);
+        leftFrontMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    public void strafeLeft(int encoder) {
+        leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() - encoder);
+        leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() - encoder);
+        
+        while(isMotorBusy()) {
+            leftBackMotor.setPower(1);
+            rightFrontMotor.setPower(1);
+            rightBackMotor.setPower(1);
+            leftFrontMotor.setPower(1);
+        }
+        leftBackMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        rightBackMotor.setPower(0);
+        leftFrontMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    //LATCH
+    public boolean isMotorBusy2() {
+        return liftMotor.isBusy();
+    }
+    public void down(int encoder) {
+        liftMotor.setTargetPosition(liftMotor.getCurrentPosition() + encoder);
+        while(isMotorBusy2()) {
+            liftMotor.setPower(0.3);
+        }
+        liftMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    public void botDown(int encoder){ //prev up
+        //liftMotor.setTargetPosition(liftMotor.getCurrentPosition() + encoder);
+        if(liftMotor.getCurrentPosition()<encoder)//isMotorBusy2()) 
+        {
+            liftMotor.setPower(0.3);
+        }
+        else
+        {
+            liftMotor.setPower(0);
+            notUsingCamera = false;
+            //step = 2;
+            setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+        }
+    }
+    /*public void liftOut(){
+        leftBackMotor.setPower(1); 
+        leftFrontMotor.setPower(-1);
+        rightBackMotor.setPower(1);
+        rightFrontMotor.setPower(-1);
+    }
+    public void orientate(){
+        leftBackMotor.setPower(1);
+        leftFrontMotor.setPower(-1);
+        rightBackMotor.setPower(1);
+        rightFrontMotor.setPower(-1);
+    }*/
+    public void setMotorMode(DcMotor.RunMode mode) {
+        leftBackMotor.setMode(mode);
+        rightFrontMotor.setMode(mode);
+        rightBackMotor.setMode(mode);
+        leftFrontMotor.setMode(mode);
+        liftMotor.setMode(mode);
+    }
+    public void stopped(){
+        leftFrontMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        leftBackMotor.setPower(0);
+        rightBackMotor.setPower(0);
+    }
+    
+    @Override
+    public void stop() {
+        cam.deactivate();
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+        stopped();
+    }
+}
