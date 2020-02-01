@@ -1,0 +1,301 @@
+//Autonmous 2018
+/* Copyright (c) 2018 FIRST. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted (subject to the limitations in the disclaimer below) provided that
+ * the following conditions are met:
+ *
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ *
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or
+ * other materials provided with the distribution.
+ *
+ * Neither the name of FIRST nor the names of its contributors may be used to endorse or
+ * promote products derived from this software without specific prior written permission.
+ * I HATE MR.CHAN
+ * NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE GRANTED BY THIS
+ * LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package org.firstinspires.ftc.teamcode;
+
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import java.util.List;
+import org.firstinspires.ftc.robotcore.external.ClassFactory;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer.CameraDirection;
+import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
+import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
+
+/**
+ * This 2018-2019 OpMode illustrates the basics of using the TensorFlow Object Detection API to
+ * determine the position of the gold and silver minerals.
+ *
+ * Use Android Studio to Copy this Class, and Paste it into your team's code folder with a new name.
+ * Remove or comment out the @Disabled line to add this opmode to the Driver Station OpMode list.
+ *
+ * IMPORTANT: In order to use this OpMode, you need to obtain your own Vuforia license key as
+ * is explained below.
+ */
+@Autonomous(name = "COMMENCING ANNUAL PURGE", group = "Concept")
+
+public class ChanIsOkay extends LinearOpMode {
+    private static final String TFOD_MODEL_ASSET = "RoverRuckus.tflite";
+    private static final String LABEL_GOLD_MINERAL = "Gold Mineral";
+    private static final String LABEL_SILVER_MINERAL = "Silver Mineral";
+    private DcMotor leftFrontMotor, rightFrontMotor, leftBackMotor, rightBackMotor;
+    private static final String VUFORIA_KEY = "ATMeJeb/////AAAAGaZ47DzTRUyOhcXnfJD+z89ATBWAF+fi+oOutLvXaf0YT/RPuf2mu6VJsJowCDiWiOzGMHUjXKsLBqA4Ziar76oZY/juheUactiQaY6Z3qPHnGmchAMlYuqgKErvggTuqmFca8VvTjtB6YOheJmAbllTDTaCudODpnIDkuFNTa36WCTr4L8HcCnIsB7bjF8pZoivYEBwPkfCVtfAiEpqxbyDAZgNXnuCyp6v/oi3FYZbp7JkFVorcM182+q0PVN5gIr14SKEMlDcDFDiv/sQwNeQOs5iNBd1OSkCoTe9CYbdmtE0gUXxKN2w9NqwATYC6YRJP9uoopxqmr9zkepI10peh2/RnU6pHOmR0KKRAVh8";
+    private VuforiaLocalizer vuforia;
+    private TFObjectDetector tfod;
+
+    @Override
+    public void runOpMode() {
+      // The TFObjectDetector uses the camera frames from the VuforiaLocalizer, so we create that
+      // first.
+      initVuforia();
+
+      if (ClassFactory.getInstance().canCreateTFObjectDetector()) {
+          initTfod();
+      } else {
+          telemetry.addData("Sorry!", "This device is not compatible with TFOD");
+      }
+      
+      try{
+            leftBackMotor = hardwareMap.get(DcMotor.class, "leftBack" );
+            leftBackMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftBackMotor.setDirection(DcMotorSimple.Direction.FORWARD);
+            
+        }
+        catch(Exception e){
+            telemetry.addLine("leftBack is not connected");
+            leftBackMotor = null;//means no reference
+        }
+        try{
+            rightBackMotor = hardwareMap.get(DcMotor.class, "rightBack" );
+            rightBackMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightBackMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        }
+        catch(Exception e){
+            telemetry.addLine("rightBack is not connected");
+            rightBackMotor=null;
+            
+        }
+        try{
+            leftFrontMotor = hardwareMap.get(DcMotor.class, "leftFront");
+            leftFrontMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            leftFrontMotor.setDirection(DcMotorSimple.Direction.FORWARD);
+        }
+        catch(Exception e){
+            telemetry.addLine("leftFront is not connected");
+            leftFrontMotor=null;
+        }
+        try{
+            rightFrontMotor = hardwareMap.get(DcMotor.class, "rightFront");
+            rightFrontMotor.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+            rightFrontMotor.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        }
+        catch(Exception e){
+            telemetry.addLine("rightFront is not connected");
+            rightFrontMotor=null;
+        }
+        leftBackMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightBackMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        leftFrontMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rightFrontMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+      /** Wait for the game to begin */
+      telemetry.addData(">", "Press Play to start tracking");
+      telemetry.update();
+      waitForStart();
+//init ends here 
+
+    //
+      if (opModeIsActive()) {
+          /** Activate Tensor Flow Object Detection. */
+          if (tfod != null) {
+              tfod.activate();
+          }
+
+          while (opModeIsActive()) {
+            if (tfod != null) {
+              // getUpdatedRecognitions() will return null if no new information is available since
+              // the last time that call was made.
+              List<Recognition> updatedRecognitions = tfod.getUpdatedRecognitions();
+              if (updatedRecognitions != null) {
+                telemetry.addData("# Object Detected", updatedRecognitions.size());
+                if (updatedRecognitions.size() == 3) {
+                  int goldMineralX = -1;
+                  int silverMineral1X = -1;
+                  int silverMineral2X = -1;
+                  int goldMineralY = -1;
+                  int goldCenterx = -1;
+                  int goldCentery = -1;
+                  int goldPos = 0;
+                  for (Recognition recognition : updatedRecognitions) {
+                    if (recognition.getLabel().equals(LABEL_GOLD_MINERAL)) {
+                      goldMineralX = (int) recognition.getLeft();
+                      goldMineralY = (int) recognition.getTop();
+                      goldCenterx = centerGold((int) recognition.getLeft(),(int) recognition.getRight());
+                      goldCentery = centerGold((int) recognition.getBottom(), (int) recognition.getTop());
+                    } else if (silverMineral1X == -1) {
+                      silverMineral1X = (int) recognition.getLeft();
+                    } else {
+                      silverMineral2X = (int) recognition.getLeft();
+                    }
+                  }
+                  if (goldMineralX != -1 && silverMineral1X != -1 && silverMineral2X != -1) {
+                    if (goldMineralX < silverMineral1X && goldMineralX < silverMineral2X) {
+                      telemetry.addData("Gold Mineral Position", "Left");
+                      goldPos = -1;
+                      //make robot go to left
+                    } else if (goldMineralX > silverMineral1X && goldMineralX > silverMineral2X) {
+                      telemetry.addData("Gold Mineral Position", "Right");
+                      goldPos = 1;
+                      //make robot go to right
+                    } else {
+                      telemetry.addData("Gold Mineral Position", "Center");
+                      goldPos = 0;
+                      //make robot go to center
+                      
+                    }
+                    if(goldPos == 0)
+                      driveForward(885);
+                    else if(goldPos == -1) {
+                      strafeLeft(100);
+                      driveForward(885);
+                    }
+                    else if(goldPos == 1) {
+                      strafeRight(100);
+                      driveForward(885);
+                    }
+                  }
+                }
+                telemetry.update();
+           }
+          }
+        }
+      }
+
+      if (tfod != null) {
+          tfod.shutdown();
+      }
+    }
+    private int centerGold(int shams, int faruuqe) {
+      return faruuqe - ((faruuqe - shams)/2);
+    }
+    public boolean isMotorBusy() {
+        return leftBackMotor.isBusy() && rightFrontMotor.isBusy() && rightBackMotor.isBusy() && leftFrontMotor.isBusy();
+    }
+    public void driveForward(int encoder) {
+        leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        
+        while(isMotorBusy()) {
+            leftBackMotor.setPower(1);
+            rightFrontMotor.setPower(1);
+            rightBackMotor.setPower(1);
+            leftFrontMotor.setPower(1);
+        }
+        leftBackMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        rightBackMotor.setPower(0);
+        leftFrontMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    public void strafeRight(int encoder) {
+          leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+          rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+          rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+          leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+          
+          while(isMotorBusy()) {
+              //right go inward and left go outward
+              leftBackMotor.setPower(-1);
+              rightFrontMotor.setPower(-1);
+              rightBackMotor.setPower(1);
+              leftFrontMotor.setPower(1);
+          }
+          leftBackMotor.setPower(0);
+          rightFrontMotor.setPower(0);
+          rightBackMotor.setPower(0);
+          leftFrontMotor.setPower(0);
+          
+          setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+          setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+      }
+      public void setMotorMode(DcMotor.RunMode mode) {
+        leftBackMotor.setMode(mode);
+        rightFrontMotor.setMode(mode);
+        rightBackMotor.setMode(mode);
+        leftFrontMotor.setMode(mode);
+    }
+    public void strafeLeft(int encoder) {
+        leftBackMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        rightFrontMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        rightBackMotor.setTargetPosition(rightBackMotor.getCurrentPosition() + encoder);
+        leftFrontMotor.setTargetPosition(leftBackMotor.getCurrentPosition() + encoder);
+        
+        while(isMotorBusy()) {
+            leftBackMotor.setPower(1);
+            rightFrontMotor.setPower(1);
+            rightBackMotor.setPower(-1);
+            leftFrontMotor.setPower(-1);
+        }
+        leftBackMotor.setPower(0);
+        rightFrontMotor.setPower(0);
+        rightBackMotor.setPower(0);
+        leftFrontMotor.setPower(0);
+        
+        setMotorMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        setMotorMode(DcMotor.RunMode.RUN_TO_POSITION);
+    }
+    /**
+     * Initialize the Vuforia localization engine.
+     */
+    private void initVuforia() {
+        /*
+         * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
+         */
+        VuforiaLocalizer.Parameters parameters = new VuforiaLocalizer.Parameters();
+
+        parameters.vuforiaLicenseKey = VUFORIA_KEY;
+        parameters.cameraDirection = CameraDirection.BACK;
+
+        //  Instantiate the Vuforia engine
+        vuforia = ClassFactory.getInstance().createVuforia(parameters);
+
+        // Loading trackables is not necessary for the Tensor Flow Object Detection engine.
+    }
+
+    /**
+     * Initialize the Tensor Flow Object Detection engine.
+     */
+    private void initTfod() {
+        int tfodMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
+            "tfodMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        TFObjectDetector.Parameters tfodParameters = new TFObjectDetector.Parameters(tfodMonitorViewId);
+        tfod = ClassFactory.getInstance().createTFObjectDetector(tfodParameters, vuforia);
+        tfod.loadModelFromAsset(TFOD_MODEL_ASSET, LABEL_GOLD_MINERAL, LABEL_SILVER_MINERAL);
+    }
+}
